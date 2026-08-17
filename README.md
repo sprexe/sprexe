@@ -5,7 +5,7 @@
 [![Email](https://img.shields.io/badge/Email-Contact_Me-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:sprextechnologies@gmail.com)
 [![Status](https://img.shields.io/badge/Status-Open_for_Full--Time_Roles_%26_Contracts-brightgreen?style=for-the-badge)](#-lets-connect--work-together)
 
-I am a **Senior Full-Stack PHP & E-commerce Software Engineer** with **14+ years of professional engineering experience**. I specialize in building, upgrading, integrating, and maintaining scalable e-commerce systems, enterprise web applications, and custom APIs.
+**Senior Full-Stack PHP & E-commerce Software Engineer** with **14+ years of professional engineering experience** building, modernizing, integrating, and maintaining scalable e-commerce platforms, enterprise web applications, and custom APIs.
 
 Having led end-to-end technical deliveries for international clients and cross-functional remote teams, I bring strong product ownership, clean-code practices, and production-grade reliability to software engineering teams.
 
@@ -65,6 +65,6 @@ I am currently open to:
 
 ---
 
-- 💼 **LinkedIn:** [Sandeep Pushkar](https://www.linkedin.com/in/sandeep-pushkar/)
+- 💼 **LinkedIn:** [Sandeep Pushkar](https://in.linkedin.com/in/sandeep-pushkar-548850292/)
 - 📧 **Direct Email:** [sprextechnologies@gmail.com](mailto:sprextechnologies@gmail.com)
 - 🏆 **Track Record & Client Testimonials:** [592+ Verified Reviews on Freelancer](https://www.freelancer.in/u/sprextech)
