@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="360" viewBox="0 0 900 360">
+  <rect width="900" height="360" rx="18" fill="#0d1117"/>
+  <rect x="1" y="1" width="898" height="358" rx="17" fill="none" stroke="#30363d"/>
+
+  <text x="45" y="58" fill="#f0f6fc" font-family="Arial, sans-serif" font-size="28" font-weight="700">
+    Sandeep Pushkar
+  </text>
+
+  <text x="45" y="88" fill="#8b949e" font-family="Arial, sans-serif" font-size="16">
+    GitHub Profile Statistics • @sprexe
+  </text>
+
+  <line x1="45" y1="112" x2="855" y2="112" stroke="#30363d"/>
+
+  <text x="55" y="155" fill="#8b949e" font-family="Arial, sans-serif" font-size="15">Repositories</text>
+  <text x="55" y="190" fill="#f0f6fc" font-family="Arial, sans-serif" font-size="30" font-weight="700">5</text>
+
+  <text x="280" y="155" fill="#8b949e" font-family="Arial, sans-serif" font-size="15">Followers</text>
+  <text x="280" y="190" fill="#f0f6fc" font-family="Arial, sans-serif" font-size="30" font-weight="700">10</text>
+
+  <text x="505" y="155" fill="#8b949e" font-family="Arial, sans-serif" font-size="15">Following</text>
+  <text x="505" y="190" fill="#f0f6fc" font-family="Arial, sans-serif" font-size="30" font-weight="700">4</text>
+
+  <text x="730" y="155" fill="#8b949e" font-family="Arial, sans-serif" font-size="15">Stars</text>
+  <text x="730" y="190" fill="#f0f6fc" font-family="Arial, sans-serif" font-size="30" font-weight="700">0</text>
+
+  <text x="55" y="235" fill="#8b949e" font-family="Arial, sans-serif" font-size="15">Top Languages</text>
+
+  <text x="55" y="270" fill="#f0f6fc" font-family="Arial, sans-serif" font-size="17">
+    No public language data
+  </text>
+
+  <text x="55" y="325" fill="#6e7681" font-family="Arial, sans-serif" font-size="13">
+    Updated automatically • 19 Aug 2026
+  </text>
+</svg>
