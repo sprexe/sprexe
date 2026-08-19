@@ -1,0 +1,160 @@
+name: Generate GitHub Stats
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate stats SVG
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+          from datetime import datetime, timezone
+
+          username = "sprexe"
+          token = os.environ["GH_TOKEN"]
+
+          query = """
+          query($login:String!) {
+            user(login:$login) {
+              name
+              login
+              avatarUrl
+              bio
+              followers { totalCount }
+              following { totalCount }
+              repositories(ownerAffiliations: OWNER, first: 100) {
+                totalCount
+                nodes {
+                  stargazerCount
+                  primaryLanguage { name }
+                }
+              }
+            }
+          }
+          """
+
+          data = json.dumps({
+              "query": query,
+              "variables": {"login": username}
+          }).encode()
+
+          req = urllib.request.Request(
+              "https://api.github.com/graphql",
+              data=data,
+              headers={
+                  "Authorization": f"Bearer {token}",
+                  "Content-Type": "application/json",
+                  "User-Agent": "sprexe-github-stats"
+              }
+          )
+
+          with urllib.request.urlopen(req) as response:
+              result = json.load(response)
+
+          user = result["data"]["user"]
+          repos = user["repositories"]["nodes"]
+
+          stars = sum(repo["stargazerCount"] for repo in repos)
+
+          languages = {}
+          for repo in repos:
+              lang = repo.get("primaryLanguage")
+              if lang:
+                  languages[lang["name"]] = languages.get(lang["name"], 0) + 1
+
+          top_languages = sorted(
+              languages.items(),
+              key=lambda x: x[1],
+              reverse=True
+          )[:5]
+
+          def esc(value):
+              return (
+                  str(value)
+                  .replace("&", "&amp;")
+                  .replace("<", "&lt;")
+                  .replace(">", "&gt;")
+                  .replace('"', "&quot;")
+              )
+
+          name = user["name"] or user["login"]
+          followers = user["followers"]["totalCount"]
+          following = user["following"]["totalCount"]
+          repo_count = user["repositories"]["totalCount"]
+
+          language_text = " • ".join(
+              f"{esc(lang)} ({count})"
+              for lang, count in top_languages
+          )
+
+          if not language_text:
+              language_text = "No public language data"
+
+          updated = datetime.now(timezone.utc).strftime("%d %b %Y")
+
+          svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="900" height="360" viewBox="0 0 900 360">
+            <rect width="900" height="360" rx="18" fill="#0d1117"/>
+            <rect x="1" y="1" width="898" height="358" rx="17" fill="none" stroke="#30363d"/>
+
+            <text x="45" y="58" fill="#f0f6fc" font-family="Arial, sans-serif" font-size="28" font-weight="700">
+              {esc(name)}
+            </text>
+
+            <text x="45" y="88" fill="#8b949e" font-family="Arial, sans-serif" font-size="16">
+              GitHub Profile Statistics • @{esc(user["login"])}
+            </text>
+
+            <line x1="45" y1="112" x2="855" y2="112" stroke="#30363d"/>
+
+            <text x="55" y="155" fill="#8b949e" font-family="Arial, sans-serif" font-size="15">Repositories</text>
+            <text x="55" y="190" fill="#f0f6fc" font-family="Arial, sans-serif" font-size="30" font-weight="700">{repo_count}</text>
+
+            <text x="280" y="155" fill="#8b949e" font-family="Arial, sans-serif" font-size="15">Followers</text>
+            <text x="280" y="190" fill="#f0f6fc" font-family="Arial, sans-serif" font-size="30" font-weight="700">{followers}</text>
+
+            <text x="505" y="155" fill="#8b949e" font-family="Arial, sans-serif" font-size="15">Following</text>
+            <text x="505" y="190" fill="#f0f6fc" font-family="Arial, sans-serif" font-size="30" font-weight="700">{following}</text>
+
+            <text x="730" y="155" fill="#8b949e" font-family="Arial, sans-serif" font-size="15">Stars</text>
+            <text x="730" y="190" fill="#f0f6fc" font-family="Arial, sans-serif" font-size="30" font-weight="700">{stars}</text>
+
+            <text x="55" y="235" fill="#8b949e" font-family="Arial, sans-serif" font-size="15">Top Languages</text>
+
+            <text x="55" y="270" fill="#f0f6fc" font-family="Arial, sans-serif" font-size="17">
+              {language_text}
+            </text>
+
+            <text x="55" y="325" fill="#6e7681" font-family="Arial, sans-serif" font-size="13">
+              Updated automatically • {updated}
+            </text>
+          </svg>'''
+
+          os.makedirs("assets", exist_ok=True)
+
+          with open("assets/github-stats.svg", "w", encoding="utf-8") as f:
+              f.write(svg)
+          PY
+
+      - name: Commit updated stats
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/github-stats.svg
+          git diff --cached --quiet || git commit -m "Update GitHub stats"
+          git push
