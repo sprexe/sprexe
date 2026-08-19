@@ -35,22 +35,22 @@ jobs:
           current_year = now.year
 
           year_start = datetime(
-              current_year, 1, 1, 0, 0, 0,
+              current_year, 1, 1,
+              0, 0, 0,
               tzinfo=timezone.utc
           ).isoformat()
 
-          year_end = datetime(
-              current_year, 12, 31, 23, 59, 59,
-              tzinfo=timezone.utc
-          ).isoformat()
+          year_end = now.isoformat()
 
           last_year_start = datetime(
-              current_year - 1, 1, 1, 0, 0, 0,
+              current_year - 1, 1, 1,
+              0, 0, 0,
               tzinfo=timezone.utc
           ).isoformat()
 
           last_year_end = datetime(
-              current_year - 1, 12, 31, 23, 59, 59,
+              current_year - 1, 12, 31,
+              23, 59, 59,
               tzinfo=timezone.utc
           ).isoformat()
 
@@ -59,7 +59,7 @@ jobs:
               payload = json.dumps({
                   "query": query,
                   "variables": variables
-              }).encode()
+              }).encode("utf-8")
 
               request = urllib.request.Request(
                   "https://api.github.com/graphql",
@@ -71,7 +71,9 @@ jobs:
                   }
               )
 
-              with urllib.request.urlopen(request) as response:
+              with urllib.request.urlopen(
+                  request
+              ) as response:
                   data = json.load(response)
 
               if "errors" in data:
@@ -93,12 +95,14 @@ jobs:
                   }
               )
 
-              with urllib.request.urlopen(request) as response:
+              with urllib.request.urlopen(
+                  request
+              ) as response:
                   return json.load(response)
 
 
           # --------------------------------
-          # GraphQL stats
+          # GitHub GraphQL statistics
           # --------------------------------
 
           query = """
@@ -157,7 +161,6 @@ jobs:
                 from: $lastFrom,
                 to: $lastTo
               ) {
-                totalCommitContributions
                 contributionCalendar {
                   totalContributions
                 }
@@ -184,7 +187,9 @@ jobs:
                   "GitHub user not found"
               )
 
-          repositories = user["repositories"]["nodes"]
+          repositories = (
+              user["repositories"]["nodes"]
+          )
 
           total_stars = sum(
               repo["stargazerCount"]
@@ -216,46 +221,97 @@ jobs:
               ["totalContributions"]
           )
 
+          total_contributions = (
+              user["currentYear"]
+              ["contributionCalendar"]
+              ["totalContributions"]
+          )
+
 
           # --------------------------------
-          # REST API language data
+          # GitHub REST API language data
           # --------------------------------
 
           language_sizes = {}
 
           repos_url = (
-              "https://api.github.com/users/"
-              + urllib.parse.quote(username)
-              + "/repos?per_page=100&type=owner"
+              f"https://api.github.com/users/"
+              f"{urllib.parse.quote(username)}/repos"
+              f"?per_page=100&type=owner&sort=updated"
           )
 
           public_repos = rest_get(repos_url)
 
           for repo in public_repos:
-              languages_url = repo.get(
-                  "languages_url"
+
+              if repo.get("private"):
+                  continue
+
+              if repo.get("fork"):
+                  continue
+
+              owner_login = (
+                  repo.get("owner", {})
+                  .get("login", username)
               )
 
-              if not languages_url:
+              repo_name = repo.get("name")
+
+              if not repo_name:
                   continue
+
+              languages_url = (
+                  "https://api.github.com/repos/"
+                  + urllib.parse.quote(owner_login)
+                  + "/"
+                  + urllib.parse.quote(repo_name)
+                  + "/languages"
+              )
 
               try:
                   repo_languages = rest_get(
                       languages_url
                   )
-              except Exception:
+
+                  print(
+                      f"Repository: {repo_name} "
+                      f"| Languages: {repo_languages}"
+                  )
+
+              except Exception as error:
+                  print(
+                      f"Could not get languages for "
+                      f"{repo_name}: {error}"
+                  )
                   continue
 
               for language, size in (
                   repo_languages.items()
               ):
+
+                  if not isinstance(
+                      size,
+                      (int, float)
+                  ):
+                      continue
+
                   language_sizes[language] = (
                       language_sizes.get(
-                          language, 0
+                          language,
+                          0
                       )
                       + size
                   )
 
+          print(
+              "Combined language data:",
+              language_sizes
+          )
+
+
+          # --------------------------------
+          # Language colors
+          # --------------------------------
 
           language_colors = {
               "PHP": "#4F5D95",
@@ -273,7 +329,10 @@ jobs:
               "Go": "#00ADD8",
               "Vue": "#41b883",
               "Blade": "#f7523f",
-              "SCSS": "#c6538c"
+              "SCSS": "#c6538c",
+              "Sass": "#c6538c",
+              "Dockerfile": "#384d54",
+              "JSON": "#292929"
           }
 
 
@@ -292,6 +351,7 @@ jobs:
           for language, size in (
               sorted_languages[:5]
           ):
+
               percentage = 0
 
               if total_language_size > 0:
@@ -320,51 +380,58 @@ jobs:
               + commits * 2
               + prs * 3
               + issues
+              + total_contributions
           )
 
           if score >= 1000:
               grade = "A+"
-              grade_color = "#58a6ff"
           elif score >= 700:
               grade = "A"
-              grade_color = "#58a6ff"
           elif score >= 400:
               grade = "B+"
-              grade_color = "#58a6ff"
           elif score >= 200:
               grade = "B"
-              grade_color = "#58a6ff"
           elif score >= 100:
               grade = "C+"
-              grade_color = "#58a6ff"
           elif score >= 50:
               grade = "C"
-              grade_color = "#58a6ff"
           else:
               grade = "D"
-              grade_color = "#58a6ff"
+
+          grade_color = "#58a6ff"
 
 
           # --------------------------------
-          # SVG language bar
+          # Language bar
           # --------------------------------
 
           language_bar = ""
 
           if top_languages:
-              bar_x = 690
-              bar_y = 185
-              bar_width = 360
+
+              bar_x = 705
+              bar_y = 160
+              bar_width = 300
               current_x = bar_x
 
-              for item in top_languages:
-                  width = (
-                      bar_width
-                      * item["percentage"]
-                      / 100
-                  )
+              for index, item in enumerate(
+                  top_languages
+              ):
 
-                  if width < 2:
+                  if index == len(top_languages) - 1:
+                      width = (
+                          bar_x
+                          + bar_width
+                          - current_x
+                      )
+                  else:
+                      width = (
+                          bar_width
+                          * item["percentage"]
+                          / 100
+                      )
+
+                  if width <= 0:
                       continue
 
                   language_bar += (
@@ -380,7 +447,7 @@ jobs:
 
 
           # --------------------------------
-          # SVG language list
+          # Language list
           # --------------------------------
 
           language_list = ""
@@ -388,11 +455,17 @@ jobs:
           for index, item in enumerate(
               top_languages
           ):
+
               column = index % 2
               row = index // 2
 
-              x = 700 + column * 190
-              y = 235 + row * 48
+              x = 705 + (
+                  column * 165
+              )
+
+              y = 215 + (
+                  row * 38
+              )
 
               language_name = html.escape(
                   item["name"]
@@ -401,13 +474,13 @@ jobs:
               language_list += f'''
               <circle
                 cx="{x}"
-                cy="{y - 6}"
-                r="6"
+                cy="{y - 5}"
+                r="5"
                 fill="{item["color"]}"
               />
 
               <text
-                x="{x + 16}"
+                x="{x + 14}"
                 y="{y}"
                 class="language">
                 {language_name}
@@ -416,10 +489,11 @@ jobs:
               '''
 
           if not top_languages:
+
               language_list = '''
               <text
-                x="700"
-                y="250"
+                x="705"
+                y="230"
                 class="language">
                 No public language data
               </text>
@@ -427,7 +501,7 @@ jobs:
 
 
           # --------------------------------
-          # SVG
+          # Display values
           # --------------------------------
 
           display_name = html.escape(
@@ -435,46 +509,56 @@ jobs:
               or user["login"]
           )
 
-          login = html.escape(
-              user["login"]
+          followers = (
+              user["followers"]["totalCount"]
           )
+
+          following = (
+              user["following"]["totalCount"]
+          )
+
+
+          # --------------------------------
+          # SVG
+          # --------------------------------
 
           svg = f'''<svg
             xmlns="http://www.w3.org/2000/svg"
             width="1100"
             height="620"
             viewBox="0 0 1100 620"
-            role="img">
+            role="img"
+            aria-label="GitHub statistics">
 
             <style>
               .section {{
-                font: 700 24px Arial, sans-serif;
-                fill: #d7e2f5;
+                font: 700 22px Arial, sans-serif;
+                fill: #aab6c7;
               }}
 
               .card-title {{
                 font: 700 18px Arial, sans-serif;
-                fill: #8ab4f8;
+                fill: #9fc1ef;
               }}
 
               .metric {{
-                font: 700 15px Arial, sans-serif;
+                font: 700 14px Arial, sans-serif;
                 fill: #7dd3c7;
               }}
 
               .value {{
-                font: 700 16px Arial, sans-serif;
+                font: 700 15px Arial, sans-serif;
                 fill: #7dd3c7;
               }}
 
               .language {{
-                font: 500 14px Arial, sans-serif;
+                font: 500 13px Arial, sans-serif;
                 fill: #7dd3c7;
               }}
 
               .footer {{
-                font: 500 15px Arial, sans-serif;
-                fill: #9ca3af;
+                font: 500 14px Arial, sans-serif;
+                fill: #8b949e;
               }}
 
               .stat-label {{
@@ -493,7 +577,7 @@ jobs:
               fill="#ffffff"
             />
 
-            <!-- Heading -->
+            <!-- GitHub Stats heading -->
             <text
               x="30"
               y="45"
@@ -510,145 +594,157 @@ jobs:
               stroke-width="1"
             />
 
-            <!-- Left Card -->
+            <!-- Stats background -->
             <rect
-              x="60"
-              y="85"
-              width="500"
-              height="245"
-              rx="5"
+              x="55"
+              y="82"
+              width="990"
+              height="255"
+              rx="8"
+              fill="#151922"
+            />
+
+            <!-- Left card -->
+            <rect
+              x="75"
+              y="102"
+              width="470"
+              height="215"
+              rx="6"
               fill="#1f2230"
+              stroke="#344050"
             />
 
             <text
-              x="85"
-              y="115"
+              x="100"
+              y="132"
               class="card-title">
               {display_name}'s GitHub Stats
             </text>
 
             <text
-              x="85"
-              y="145"
+              x="100"
+              y="163"
               class="metric">
               ☆ Total Stars Earned:
             </text>
 
             <text
-              x="430"
-              y="145"
+              x="435"
+              y="163"
               class="value">
               {total_stars}
             </text>
 
             <text
-              x="85"
-              y="180"
+              x="100"
+              y="195"
               class="metric">
               ↻ Total Commits ({current_year}):
             </text>
 
             <text
-              x="430"
-              y="180"
+              x="435"
+              y="195"
               class="value">
               {commits}
             </text>
 
             <text
-              x="85"
-              y="215"
+              x="100"
+              y="227"
               class="metric">
               ⇅ Total PRs:
             </text>
 
             <text
-              x="430"
-              y="215"
+              x="435"
+              y="227"
               class="value">
               {prs}
             </text>
 
             <text
-              x="85"
-              y="250"
+              x="100"
+              y="259"
               class="metric">
               ⓘ Total Issues:
             </text>
 
             <text
-              x="430"
-              y="250"
+              x="435"
+              y="259"
               class="value">
               {issues}
             </text>
 
             <text
-              x="85"
-              y="285"
+              x="100"
+              y="291"
               class="metric">
               ▣ Contributed to (last year):
             </text>
 
             <text
-              x="430"
-              y="285"
+              x="435"
+              y="291"
               class="value">
               {contributed_last_year}
             </text>
 
             <!-- Grade circle -->
             <circle
-              cx="500"
-              cy="190"
-              r="52"
+              cx="495"
+              cy="210"
+              r="42"
               fill="#1f2230"
               stroke="#405274"
               stroke-width="5"
             />
 
             <circle
-              cx="500"
-              cy="190"
-              r="48"
+              cx="495"
+              cy="210"
+              r="39"
               fill="none"
               stroke="{grade_color}"
-              stroke-width="6"
-              stroke-dasharray="120 302"
+              stroke-width="5"
+              stroke-dasharray="95 245"
               stroke-linecap="round"
-              transform="rotate(-90 500 190)"
+              transform="rotate(-90 495 210)"
             />
 
             <text
-              x="500"
-              y="198"
+              x="495"
+              y="218"
               text-anchor="middle"
-              style="font:700 22px Arial;fill:{grade_color};">
+              style="font:700 21px Arial;fill:{grade_color};">
               {grade}
             </text>
 
-            <!-- Right Card -->
+            <!-- Right card -->
             <rect
               x="565"
-              y="85"
-              width="450"
-              height="245"
-              rx="5"
+              y="102"
+              width="460"
+              height="215"
+              rx="6"
               fill="#1f2230"
+              stroke="#344050"
             />
 
             <text
               x="590"
-              y="115"
+              y="132"
               class="card-title">
               Most Used Languages
             </text>
 
-            <!-- Language Bar Background -->
+            <!-- Language bar background -->
             <rect
-              x="690"
-              y="185"
-              width="360"
+              x="705"
+              y="160"
+              width="300"
               height="10"
               rx="5"
               fill="#39404b"
@@ -658,44 +754,44 @@ jobs:
 
             {language_list}
 
-            <!-- Footer stats -->
+            <!-- Followers -->
             <line
               x1="590"
-              y1="290"
-              x2="990"
-              y2="290"
-              stroke="#4b5563"
+              y1="278"
+              x2="1000"
+              y2="278"
+              stroke="#39404b"
             />
 
             <text
-              x="615"
-              y="315"
-              style="font:500 16px Arial;fill:#d1d5db;">
+              x="620"
+              y="303"
+              style="font:500 14px Arial;fill:#cbd5e1;">
               👥 Followers:
             </text>
 
             <text
-              x="745"
-              y="315"
-              style="font:700 16px Arial;fill:#d1d5db;">
-              {user["followers"]["totalCount"]}
+              x="735"
+              y="303"
+              style="font:700 14px Arial;fill:#cbd5e1;">
+              {followers}
             </text>
 
             <text
-              x="820"
-              y="315"
-              style="font:500 16px Arial;fill:#d1d5db;">
+              x="835"
+              y="303"
+              style="font:500 14px Arial;fill:#cbd5e1;">
               👤 Following:
             </text>
 
             <text
               x="950"
-              y="315"
-              style="font:700 16px Arial;fill:#d1d5db;">
-              {user["following"]["totalCount"]}
+              y="303"
+              style="font:700 14px Arial;fill:#cbd5e1;">
+              {following}
             </text>
 
-            <!-- Streak Section -->
+            <!-- Streak heading -->
             <line
               x1="25"
               y1="370"
@@ -711,72 +807,73 @@ jobs:
               🔥 Streak Stats
             </text>
 
+            <!-- Streak card -->
             <rect
-              x="60"
-              y="430"
-              width="980"
+              x="55"
+              y="425"
+              width="990"
               height="110"
-              rx="5"
+              rx="6"
               fill="#1f2230"
             />
 
             <text
               x="150"
-              y="475"
+              y="470"
               class="stat-label">
               Current Streak
             </text>
 
             <text
-              x="170"
-              y="515"
+              x="180"
+              y="510"
               class="stat-value"
               fill="#58a6ff">
               0
             </text>
 
             <text
-              x="210"
-              y="515"
+              x="225"
+              y="510"
               class="stat-label">
               days
             </text>
 
             <text
-              x="420"
-              y="475"
+              x="430"
+              y="470"
               class="stat-label">
               Longest Streak
             </text>
 
             <text
-              x="440"
-              y="515"
+              x="455"
+              y="510"
               class="stat-value"
               fill="#a371f7">
               0
             </text>
 
             <text
-              x="480"
-              y="515"
+              x="500"
+              y="510"
               class="stat-label">
               days
             </text>
 
             <text
-              x="700"
-              y="475"
+              x="710"
+              y="470"
               class="stat-label">
               Total Contributions
             </text>
 
             <text
-              x="770"
-              y="515"
+              x="790"
+              y="510"
               class="stat-value"
               fill="#f2cc60">
-              {user["currentYear"]["contributionCalendar"]["totalContributions"]}
+              {total_contributions}
             </text>
 
             <text
@@ -800,7 +897,9 @@ jobs:
           ) as file:
               file.write(svg)
 
-          print("GitHub stats SVG generated successfully.")
+          print(
+              "GitHub stats SVG generated successfully."
+          )
 
           PY
 
