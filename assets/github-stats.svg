@@ -1,240 +1,355 @@
 <svg
   xmlns="http://www.w3.org/2000/svg"
   width="1100"
-  height="440"
-  viewBox="0 0 1100 440"
-  role="img"
-  aria-labelledby="title description">
-
-  <title id="title">
-    Sandeep Pushkar's GitHub Statistics
-  </title>
-
-  <desc id="description">
-    GitHub statistics and most used programming languages
-  </desc>
+  height="620"
+  viewBox="0 0 1100 620"
+  role="img">
 
   <style>
-    .title {
+    .section {
       font: 700 24px Arial, sans-serif;
-      fill: #e6edf3;
+      fill: #d7e2f5;
     }
 
-    .subtitle {
-      font: 500 15px Arial, sans-serif;
-      fill: #8b949e;
+    .card-title {
+      font: 700 18px Arial, sans-serif;
+      fill: #8ab4f8;
     }
 
-    .label {
-      font: 600 15px Arial, sans-serif;
-      fill: #8b949e;
+    .metric {
+      font: 700 15px Arial, sans-serif;
+      fill: #7dd3c7;
     }
 
     .value {
-      font: 700 25px Arial, sans-serif;
-      fill: #e6edf3;
+      font: 700 16px Arial, sans-serif;
+      fill: #7dd3c7;
     }
 
     .language {
-      font: 600 14px Arial, sans-serif;
-      fill: #c9d1d9;
+      font: 500 14px Arial, sans-serif;
+      fill: #7dd3c7;
     }
 
-    .percentage {
-      font: 500 13px Arial, sans-serif;
-      fill: #8b949e;
-    }
-
-    .muted {
+    .footer {
       font: 500 15px Arial, sans-serif;
-      fill: #8b949e;
+      fill: #9ca3af;
+    }
+
+    .stat-label {
+      font: 500 14px Arial, sans-serif;
+      fill: #cbd5e1;
+    }
+
+    .stat-value {
+      font: 700 30px Arial, sans-serif;
     }
   </style>
 
   <rect
-    width="100%"
-    height="100%"
-    rx="18"
-    fill="#0d1117"/>
+    width="1100"
+    height="620"
+    fill="#ffffff"
+  />
 
-  <!-- Left stats card -->
-  <rect
+  <!-- Heading -->
+  <text
     x="30"
-    y="30"
-    width="510"
-    height="380"
-    rx="16"
-    fill="#161b22"
-    stroke="#30363d"/>
+    y="45"
+    class="section">
+    📊 GitHub Stats
+  </text>
+
+  <line
+    x1="25"
+    y1="62"
+    x2="1075"
+    y2="62"
+    stroke="#cbd5e1"
+    stroke-width="1"
+  />
+
+  <!-- Left Card -->
+  <rect
+    x="60"
+    y="85"
+    width="500"
+    height="245"
+    rx="5"
+    fill="#1f2230"
+  />
 
   <text
-    x="65"
-    y="80"
-    class="title">
+    x="85"
+    y="115"
+    class="card-title">
     Sandeep Pushkar's GitHub Stats
   </text>
 
   <text
-    x="65"
-    y="110"
-    class="subtitle">
-    @sprexe • Updated automatically
+    x="85"
+    y="145"
+    class="metric">
+    ☆ Total Stars Earned:
   </text>
 
-  <line
-    x1="65"
-    y1="135"
-    x2="505"
-    y2="135"
-    stroke="#30363d"/>
+  <text
+    x="430"
+    y="145"
+    class="value">
+    0
+  </text>
 
   <text
-    x="65"
+    x="85"
     y="180"
-    class="label">
-    Total Stars Earned
+    class="metric">
+    ↻ Total Commits (2026):
   </text>
 
   <text
-    x="65"
+    x="430"
+    y="180"
+    class="value">
+    24
+  </text>
+
+  <text
+    x="85"
+    y="215"
+    class="metric">
+    ⇅ Total PRs:
+  </text>
+
+  <text
+    x="430"
     y="215"
     class="value">
     0
   </text>
 
   <text
-    x="280"
-    y="180"
-    class="label">
-    Repositories
+    x="85"
+    y="250"
+    class="metric">
+    ⓘ Total Issues:
   </text>
 
   <text
-    x="280"
-    y="215"
-    class="value">
-    5
-  </text>
-
-  <text
-    x="65"
-    y="275"
-    class="label">
-    Commits (2026)
-  </text>
-
-  <text
-    x="65"
-    y="310"
-    class="value">
-    23
-  </text>
-
-  <text
-    x="280"
-    y="275"
-    class="label">
-    Pull Requests
-  </text>
-
-  <text
-    x="280"
-    y="310"
+    x="430"
+    y="250"
     class="value">
     0
   </text>
 
   <text
-    x="65"
-    y="370"
-    class="label">
-    Issues
+    x="85"
+    y="285"
+    class="metric">
+    ▣ Contributed to (last year):
   </text>
 
   <text
-    x="65"
-    y="400"
+    x="430"
+    y="285"
     class="value">
-    0
+    1
   </text>
+
+  <!-- Grade circle -->
+  <circle
+    cx="500"
+    cy="190"
+    r="52"
+    fill="#1f2230"
+    stroke="#405274"
+    stroke-width="5"
+  />
 
   <circle
-    cx="450"
-    cy="355"
+    cx="500"
+    cy="190"
     r="48"
     fill="none"
     stroke="#58a6ff"
-    stroke-width="8"/>
+    stroke-width="6"
+    stroke-dasharray="120 302"
+    stroke-linecap="round"
+    transform="rotate(-90 500 190)"
+  />
 
   <text
-    x="450"
-    y="365"
+    x="500"
+    y="198"
     text-anchor="middle"
-    style="font: 700 28px Arial, sans-serif; fill:#58a6ff;">
-    C
+    style="font:700 22px Arial;fill:#58a6ff;">
+    D
   </text>
 
-  <!-- Right languages card -->
+  <!-- Right Card -->
   <rect
-    x="570"
-    y="30"
-    width="500"
-    height="380"
-    rx="16"
-    fill="#161b22"
-    stroke="#30363d"/>
+    x="565"
+    y="85"
+    width="450"
+    height="245"
+    rx="5"
+    fill="#1f2230"
+  />
 
   <text
-    x="620"
-    y="85"
-    class="title">
+    x="590"
+    y="115"
+    class="card-title">
     Most Used Languages
   </text>
 
-  <text
-    x="620"
-    y="115"
-    class="subtitle">
-    Based on your public repositories
-  </text>
-
+  <!-- Language Bar Background -->
   <rect
-    x="620"
-    y="140"
-    width="400"
-    height="12"
-    rx="6"
-    fill="#30363d"/>
+    x="690"
+    y="185"
+    width="360"
+    height="10"
+    rx="5"
+    fill="#39404b"
+  />
 
   
 
   
-    <text x="620"
-          y="210"
-          class="muted">
-      No public language data available
+    <text
+      x="700"
+      y="250"
+      class="language">
+      No public language data
     </text>
     
 
+  <!-- Footer stats -->
   <line
-    x1="620"
-    y1="350"
-    x2="1020"
-    y2="350"
-    stroke="#30363d"/>
+    x1="590"
+    y1="290"
+    x2="990"
+    y2="290"
+    stroke="#4b5563"
+  />
 
   <text
-    x="620"
-    y="385"
-    class="subtitle">
-    Followers: 11
+    x="615"
+    y="315"
+    style="font:500 16px Arial;fill:#d1d5db;">
+    👥 Followers:
   </text>
 
   <text
-    x="850"
-    y="385"
-    class="subtitle">
-    Following: 5
+    x="745"
+    y="315"
+    style="font:700 16px Arial;fill:#d1d5db;">
+    11
+  </text>
+
+  <text
+    x="820"
+    y="315"
+    style="font:500 16px Arial;fill:#d1d5db;">
+    👤 Following:
+  </text>
+
+  <text
+    x="950"
+    y="315"
+    style="font:700 16px Arial;fill:#d1d5db;">
+    5
+  </text>
+
+  <!-- Streak Section -->
+  <line
+    x1="25"
+    y1="370"
+    x2="1075"
+    y2="370"
+    stroke="#cbd5e1"
+  />
+
+  <text
+    x="30"
+    y="405"
+    class="section">
+    🔥 Streak Stats
+  </text>
+
+  <rect
+    x="60"
+    y="430"
+    width="980"
+    height="110"
+    rx="5"
+    fill="#1f2230"
+  />
+
+  <text
+    x="150"
+    y="475"
+    class="stat-label">
+    Current Streak
+  </text>
+
+  <text
+    x="170"
+    y="515"
+    class="stat-value"
+    fill="#58a6ff">
+    0
+  </text>
+
+  <text
+    x="210"
+    y="515"
+    class="stat-label">
+    days
+  </text>
+
+  <text
+    x="420"
+    y="475"
+    class="stat-label">
+    Longest Streak
+  </text>
+
+  <text
+    x="440"
+    y="515"
+    class="stat-value"
+    fill="#a371f7">
+    0
+  </text>
+
+  <text
+    x="480"
+    y="515"
+    class="stat-label">
+    days
+  </text>
+
+  <text
+    x="700"
+    y="475"
+    class="stat-label">
+    Total Contributions
+  </text>
+
+  <text
+    x="770"
+    y="515"
+    class="stat-value"
+    fill="#f2cc60">
+    53
+  </text>
+
+  <text
+    x="30"
+    y="590"
+    class="footer">
+    Note: Stats are updated daily via GitHub Actions 🚀
   </text>
 
 </svg>
