@@ -16,7 +16,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Generate professional GitHub stats
+      - name: Generate GitHub stats SVG
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -24,6 +24,7 @@ jobs:
           import json
           import os
           import urllib.request
+          import urllib.parse
           import html
           from datetime import datetime, timezone
 
@@ -31,14 +32,82 @@ jobs:
           token = os.environ["GH_TOKEN"]
 
           now = datetime.now(timezone.utc)
-          year_start = datetime(now.year, 1, 1, tzinfo=timezone.utc).isoformat()
-          year_end = datetime(now.year, 12, 31, 23, 59, 59, tzinfo=timezone.utc).isoformat()
+          current_year = now.year
+
+          year_start = datetime(
+              current_year, 1, 1, 0, 0, 0,
+              tzinfo=timezone.utc
+          ).isoformat()
+
+          year_end = datetime(
+              current_year, 12, 31, 23, 59, 59,
+              tzinfo=timezone.utc
+          ).isoformat()
+
+          last_year_start = datetime(
+              current_year - 1, 1, 1, 0, 0, 0,
+              tzinfo=timezone.utc
+          ).isoformat()
+
+          last_year_end = datetime(
+              current_year - 1, 12, 31, 23, 59, 59,
+              tzinfo=timezone.utc
+          ).isoformat()
+
+
+          def graphql(query, variables):
+              payload = json.dumps({
+                  "query": query,
+                  "variables": variables
+              }).encode()
+
+              request = urllib.request.Request(
+                  "https://api.github.com/graphql",
+                  data=payload,
+                  headers={
+                      "Authorization": f"Bearer {token}",
+                      "Content-Type": "application/json",
+                      "User-Agent": "sprexe-github-stats"
+                  }
+              )
+
+              with urllib.request.urlopen(request) as response:
+                  data = json.load(response)
+
+              if "errors" in data:
+                  raise RuntimeError(
+                      json.dumps(data["errors"])
+                  )
+
+              return data["data"]
+
+
+          def rest_get(url):
+              request = urllib.request.Request(
+                  url,
+                  headers={
+                      "Authorization": f"Bearer {token}",
+                      "Accept": "application/vnd.github+json",
+                      "User-Agent": "sprexe-github-stats",
+                      "X-GitHub-Api-Version": "2022-11-28"
+                  }
+              )
+
+              with urllib.request.urlopen(request) as response:
+                  return json.load(response)
+
+
+          # --------------------------------
+          # GraphQL stats
+          # --------------------------------
 
           query = """
           query(
             $login: String!,
-            $from: DateTime!,
-            $to: DateTime!
+            $currentFrom: DateTime!,
+            $currentTo: DateTime!,
+            $lastFrom: DateTime!,
+            $lastTo: DateTime!
           ) {
             user(login: $login) {
               name
@@ -58,27 +127,37 @@ jobs:
                 privacy: PUBLIC
               ) {
                 totalCount
+
                 nodes {
+                  name
                   stargazerCount
-                  languages(first: 10) {
-                    edges {
-                      size
-                      node {
-                        name
-                        color
-                      }
+                }
+              }
+
+              currentYear: contributionsCollection(
+                from: $currentFrom,
+                to: $currentTo
+              ) {
+                totalCommitContributions
+                totalPullRequestContributions
+                totalIssueContributions
+
+                contributionCalendar {
+                  totalContributions
+                  weeks {
+                    contributionDays {
+                      date
+                      contributionCount
                     }
                   }
                 }
               }
 
-              contributionsCollection(
-                from: $from,
-                to: $to
+              lastYear: contributionsCollection(
+                from: $lastFrom,
+                to: $lastTo
               ) {
                 totalCommitContributions
-                totalPullRequestContributions
-                totalIssueContributions
                 contributionCalendar {
                   totalContributions
                 }
@@ -87,420 +166,632 @@ jobs:
           }
           """
 
-          payload = json.dumps({
-              "query": query,
-              "variables": {
+          data = graphql(
+              query,
+              {
                   "login": username,
-                  "from": year_start,
-                  "to": year_end
-              }
-          }).encode()
-
-          request = urllib.request.Request(
-              "https://api.github.com/graphql",
-              data=payload,
-              headers={
-                  "Authorization": f"Bearer {token}",
-                  "Content-Type": "application/json",
-                  "User-Agent": "sprexe-github-stats"
+                  "currentFrom": year_start,
+                  "currentTo": year_end,
+                  "lastFrom": last_year_start,
+                  "lastTo": last_year_end
               }
           )
 
-          with urllib.request.urlopen(request) as response:
-              result = json.load(response)
-
-          if "errors" in result:
-              raise RuntimeError(json.dumps(result["errors"]))
-
-          user = result["data"]["user"]
+          user = data["user"]
 
           if not user:
-              raise RuntimeError("GitHub user not found")
+              raise RuntimeError(
+                  "GitHub user not found"
+              )
 
-          repositories = user["repositories"]
-          contributions = user["contributionsCollection"]
+          repositories = user["repositories"]["nodes"]
 
           total_stars = sum(
               repo["stargazerCount"]
-              for repo in repositories["nodes"]
+              for repo in repositories
           )
 
+          repository_count = (
+              user["repositories"]["totalCount"]
+          )
+
+          commits = (
+              user["currentYear"]
+              ["totalCommitContributions"]
+          )
+
+          prs = (
+              user["currentYear"]
+              ["totalPullRequestContributions"]
+          )
+
+          issues = (
+              user["currentYear"]
+              ["totalIssueContributions"]
+          )
+
+          contributed_last_year = (
+              user["lastYear"]
+              ["contributionCalendar"]
+              ["totalContributions"]
+          )
+
+
+          # --------------------------------
+          # REST API language data
+          # --------------------------------
+
           language_sizes = {}
-          language_colors = {}
 
-          for repo in repositories["nodes"]:
-              for edge in repo["languages"]["edges"]:
-                  language = edge["node"]["name"]
-                  size = edge["size"]
-                  color = edge["node"]["color"] or "#8b949e"
+          repos_url = (
+              "https://api.github.com/users/"
+              + urllib.parse.quote(username)
+              + "/repos?per_page=100&type=owner"
+          )
 
+          public_repos = rest_get(repos_url)
+
+          for repo in public_repos:
+              languages_url = repo.get(
+                  "languages_url"
+              )
+
+              if not languages_url:
+                  continue
+
+              try:
+                  repo_languages = rest_get(
+                      languages_url
+                  )
+              except Exception:
+                  continue
+
+              for language, size in (
+                  repo_languages.items()
+              ):
                   language_sizes[language] = (
-                      language_sizes.get(language, 0) + size
+                      language_sizes.get(
+                          language, 0
+                      )
+                      + size
                   )
 
-                  language_colors[language] = color
 
-          top_languages = sorted(
+          language_colors = {
+              "PHP": "#4F5D95",
+              "JavaScript": "#f1e05a",
+              "TypeScript": "#3178c6",
+              "HTML": "#e34c26",
+              "CSS": "#563d7c",
+              "Python": "#3572A5",
+              "Java": "#b07219",
+              "Shell": "#89e051",
+              "C": "#555555",
+              "C++": "#f34b7d",
+              "C#": "#178600",
+              "Ruby": "#701516",
+              "Go": "#00ADD8",
+              "Vue": "#41b883",
+              "Blade": "#f7523f",
+              "SCSS": "#c6538c"
+          }
+
+
+          total_language_size = sum(
+              language_sizes.values()
+          )
+
+          sorted_languages = sorted(
               language_sizes.items(),
               key=lambda item: item[1],
               reverse=True
-          )[:5]
-
-          total_language_size = sum(
-              size for _, size in top_languages
           )
 
-          if total_language_size == 0:
-              language_percentages = []
-          else:
-              language_percentages = [
-                  (
-                      language,
-                      size,
-                      round(size / total_language_size * 100, 1)
-                  )
-                  for language, size in top_languages
-              ]
+          top_languages = []
 
-          commits = contributions["totalCommitContributions"]
-          prs = contributions["totalPullRequestContributions"]
-          issues = contributions["totalIssueContributions"]
-          total_contributions = contributions[
-              "contributionCalendar"
-          ]["totalContributions"]
+          for language, size in (
+              sorted_languages[:5]
+          ):
+              percentage = 0
+
+              if total_language_size > 0:
+                  percentage = (
+                      size
+                      / total_language_size
+                      * 100
+                  )
+
+              top_languages.append({
+                  "name": language,
+                  "percentage": percentage,
+                  "color": language_colors.get(
+                      language,
+                      "#8b949e"
+                  )
+              })
+
+
+          # --------------------------------
+          # Grade calculation
+          # --------------------------------
 
           score = (
               total_stars * 5
               + commits * 2
               + prs * 3
               + issues
-              + total_contributions
           )
 
           if score >= 1000:
               grade = "A+"
+              grade_color = "#58a6ff"
           elif score >= 700:
               grade = "A"
+              grade_color = "#58a6ff"
           elif score >= 400:
               grade = "B+"
+              grade_color = "#58a6ff"
           elif score >= 200:
               grade = "B"
+              grade_color = "#58a6ff"
           elif score >= 100:
               grade = "C+"
+              grade_color = "#58a6ff"
           elif score >= 50:
               grade = "C"
+              grade_color = "#58a6ff"
           else:
               grade = "D"
+              grade_color = "#58a6ff"
 
-          display_name = html.escape(
-              user["name"] or user["login"]
-          )
 
-          svg_width = 1100
-          svg_height = 440
+          # --------------------------------
+          # SVG language bar
+          # --------------------------------
 
           language_bar = ""
-          language_list = ""
 
-          if language_percentages:
-              x_position = 620
-              bar_width = 400
+          if top_languages:
+              bar_x = 690
+              bar_y = 185
+              bar_width = 360
+              current_x = bar_x
 
-              for language, _, percentage in language_percentages:
-                  width = bar_width * percentage / 100
-                  color = language_colors.get(
-                      language,
-                      "#8b949e"
+              for item in top_languages:
+                  width = (
+                      bar_width
+                      * item["percentage"]
+                      / 100
                   )
+
+                  if width < 2:
+                      continue
 
                   language_bar += (
-                      f'<rect x="{x_position:.2f}" '
-                      f'y="140" '
+                      f'<rect '
+                      f'x="{current_x:.2f}" '
+                      f'y="{bar_y}" '
                       f'width="{width:.2f}" '
-                      f'height="12" '
-                      f'fill="{color}"/>'
+                      f'height="10" '
+                      f'fill="{item["color"]}"/>'
                   )
 
-                  x_position += width
+                  current_x += width
 
-              list_y = 195
 
-              for index, (
-                  language,
-                  _,
-                  percentage
-              ) in enumerate(language_percentages):
-                  color = language_colors.get(
-                      language,
-                      "#8b949e"
-                  )
+          # --------------------------------
+          # SVG language list
+          # --------------------------------
 
-                  column = index % 2
-                  row = index // 2
+          language_list = ""
 
-                  x = 620 + column * 200
-                  y = list_y + row * 55
+          for index, item in enumerate(
+              top_languages
+          ):
+              column = index % 2
+              row = index // 2
 
-                  language_list += f'''
-                  <circle cx="{x}" cy="{y - 5}"
-                          r="6"
-                          fill="{color}"/>
-                  <text x="{x + 15}"
-                        y="{y}"
-                        class="language">
-                    {html.escape(language)}
-                  </text>
-                  <text x="{x + 15}"
-                        y="{y + 20}"
-                        class="percentage">
-                    {percentage}%
-                  </text>
-                  '''
-          else:
-              language_list = '''
-              <text x="620"
-                    y="210"
-                    class="muted">
-                No public language data available
+              x = 700 + column * 190
+              y = 235 + row * 48
+
+              language_name = html.escape(
+                  item["name"]
+              )
+
+              language_list += f'''
+              <circle
+                cx="{x}"
+                cy="{y - 6}"
+                r="6"
+                fill="{item["color"]}"
+              />
+
+              <text
+                x="{x + 16}"
+                y="{y}"
+                class="language">
+                {language_name}
+                {item["percentage"]:.2f}%
               </text>
               '''
 
+          if not top_languages:
+              language_list = '''
+              <text
+                x="700"
+                y="250"
+                class="language">
+                No public language data
+              </text>
+              '''
+
+
+          # --------------------------------
+          # SVG
+          # --------------------------------
+
+          display_name = html.escape(
+              user["name"]
+              or user["login"]
+          )
+
+          login = html.escape(
+              user["login"]
+          )
+
           svg = f'''<svg
             xmlns="http://www.w3.org/2000/svg"
-            width="{svg_width}"
-            height="{svg_height}"
-            viewBox="0 0 {svg_width} {svg_height}"
-            role="img"
-            aria-labelledby="title description">
-
-            <title id="title">
-              {display_name}'s GitHub Statistics
-            </title>
-
-            <desc id="description">
-              GitHub statistics and most used programming languages
-            </desc>
+            width="1100"
+            height="620"
+            viewBox="0 0 1100 620"
+            role="img">
 
             <style>
-              .title {{
+              .section {{
                 font: 700 24px Arial, sans-serif;
-                fill: #e6edf3;
+                fill: #d7e2f5;
               }}
 
-              .subtitle {{
-                font: 500 15px Arial, sans-serif;
-                fill: #8b949e;
+              .card-title {{
+                font: 700 18px Arial, sans-serif;
+                fill: #8ab4f8;
               }}
 
-              .label {{
-                font: 600 15px Arial, sans-serif;
-                fill: #8b949e;
+              .metric {{
+                font: 700 15px Arial, sans-serif;
+                fill: #7dd3c7;
               }}
 
               .value {{
-                font: 700 25px Arial, sans-serif;
-                fill: #e6edf3;
+                font: 700 16px Arial, sans-serif;
+                fill: #7dd3c7;
               }}
 
               .language {{
-                font: 600 14px Arial, sans-serif;
-                fill: #c9d1d9;
+                font: 500 14px Arial, sans-serif;
+                fill: #7dd3c7;
               }}
 
-              .percentage {{
-                font: 500 13px Arial, sans-serif;
-                fill: #8b949e;
-              }}
-
-              .muted {{
+              .footer {{
                 font: 500 15px Arial, sans-serif;
-                fill: #8b949e;
+                fill: #9ca3af;
+              }}
+
+              .stat-label {{
+                font: 500 14px Arial, sans-serif;
+                fill: #cbd5e1;
+              }}
+
+              .stat-value {{
+                font: 700 30px Arial, sans-serif;
               }}
             </style>
 
             <rect
-              width="100%"
-              height="100%"
-              rx="18"
-              fill="#0d1117"/>
+              width="1100"
+              height="620"
+              fill="#ffffff"
+            />
 
-            <!-- Left stats card -->
-            <rect
+            <!-- Heading -->
+            <text
               x="30"
-              y="30"
-              width="510"
-              height="380"
-              rx="16"
-              fill="#161b22"
-              stroke="#30363d"/>
+              y="45"
+              class="section">
+              📊 GitHub Stats
+            </text>
+
+            <line
+              x1="25"
+              y1="62"
+              x2="1075"
+              y2="62"
+              stroke="#cbd5e1"
+              stroke-width="1"
+            />
+
+            <!-- Left Card -->
+            <rect
+              x="60"
+              y="85"
+              width="500"
+              height="245"
+              rx="5"
+              fill="#1f2230"
+            />
 
             <text
-              x="65"
-              y="80"
-              class="title">
+              x="85"
+              y="115"
+              class="card-title">
               {display_name}'s GitHub Stats
             </text>
 
             <text
-              x="65"
-              y="110"
-              class="subtitle">
-              @{html.escape(user["login"])} • Updated automatically
-            </text>
-
-            <line
-              x1="65"
-              y1="135"
-              x2="505"
-              y2="135"
-              stroke="#30363d"/>
-
-            <text
-              x="65"
-              y="180"
-              class="label">
-              Total Stars Earned
+              x="85"
+              y="145"
+              class="metric">
+              ☆ Total Stars Earned:
             </text>
 
             <text
-              x="65"
-              y="215"
+              x="430"
+              y="145"
               class="value">
               {total_stars}
             </text>
 
             <text
-              x="280"
+              x="85"
               y="180"
-              class="label">
-              Repositories
+              class="metric">
+              ↻ Total Commits ({current_year}):
             </text>
 
             <text
-              x="280"
-              y="215"
-              class="value">
-              {repositories["totalCount"]}
-            </text>
-
-            <text
-              x="65"
-              y="275"
-              class="label">
-              Commits ({now.year})
-            </text>
-
-            <text
-              x="65"
-              y="310"
+              x="430"
+              y="180"
               class="value">
               {commits}
             </text>
 
             <text
-              x="280"
-              y="275"
-              class="label">
-              Pull Requests
+              x="85"
+              y="215"
+              class="metric">
+              ⇅ Total PRs:
             </text>
 
             <text
-              x="280"
-              y="310"
+              x="430"
+              y="215"
               class="value">
               {prs}
             </text>
 
             <text
-              x="65"
-              y="370"
-              class="label">
-              Issues
+              x="85"
+              y="250"
+              class="metric">
+              ⓘ Total Issues:
             </text>
 
             <text
-              x="65"
-              y="400"
+              x="430"
+              y="250"
               class="value">
               {issues}
             </text>
 
-            <circle
-              cx="450"
-              cy="355"
-              r="48"
-              fill="none"
-              stroke="#58a6ff"
-              stroke-width="8"/>
+            <text
+              x="85"
+              y="285"
+              class="metric">
+              ▣ Contributed to (last year):
+            </text>
 
             <text
-              x="450"
-              y="365"
+              x="430"
+              y="285"
+              class="value">
+              {contributed_last_year}
+            </text>
+
+            <!-- Grade circle -->
+            <circle
+              cx="500"
+              cy="190"
+              r="52"
+              fill="#1f2230"
+              stroke="#405274"
+              stroke-width="5"
+            />
+
+            <circle
+              cx="500"
+              cy="190"
+              r="48"
+              fill="none"
+              stroke="{grade_color}"
+              stroke-width="6"
+              stroke-dasharray="120 302"
+              stroke-linecap="round"
+              transform="rotate(-90 500 190)"
+            />
+
+            <text
+              x="500"
+              y="198"
               text-anchor="middle"
-              style="font: 700 28px Arial, sans-serif; fill:#58a6ff;">
+              style="font:700 22px Arial;fill:{grade_color};">
               {grade}
             </text>
 
-            <!-- Right languages card -->
+            <!-- Right Card -->
             <rect
-              x="570"
-              y="30"
-              width="500"
-              height="380"
-              rx="16"
-              fill="#161b22"
-              stroke="#30363d"/>
+              x="565"
+              y="85"
+              width="450"
+              height="245"
+              rx="5"
+              fill="#1f2230"
+            />
 
             <text
-              x="620"
-              y="85"
-              class="title">
+              x="590"
+              y="115"
+              class="card-title">
               Most Used Languages
             </text>
 
-            <text
-              x="620"
-              y="115"
-              class="subtitle">
-              Based on your public repositories
-            </text>
-
+            <!-- Language Bar Background -->
             <rect
-              x="620"
-              y="140"
-              width="400"
-              height="12"
-              rx="6"
-              fill="#30363d"/>
+              x="690"
+              y="185"
+              width="360"
+              height="10"
+              rx="5"
+              fill="#39404b"
+            />
 
             {language_bar}
 
             {language_list}
 
+            <!-- Footer stats -->
             <line
-              x1="620"
-              y1="350"
-              x2="1020"
-              y2="350"
-              stroke="#30363d"/>
+              x1="590"
+              y1="290"
+              x2="990"
+              y2="290"
+              stroke="#4b5563"
+            />
 
             <text
-              x="620"
-              y="385"
-              class="subtitle">
-              Followers: {user["followers"]["totalCount"]}
+              x="615"
+              y="315"
+              style="font:500 16px Arial;fill:#d1d5db;">
+              👥 Followers:
             </text>
 
             <text
-              x="850"
-              y="385"
-              class="subtitle">
-              Following: {user["following"]["totalCount"]}
+              x="745"
+              y="315"
+              style="font:700 16px Arial;fill:#d1d5db;">
+              {user["followers"]["totalCount"]}
+            </text>
+
+            <text
+              x="820"
+              y="315"
+              style="font:500 16px Arial;fill:#d1d5db;">
+              👤 Following:
+            </text>
+
+            <text
+              x="950"
+              y="315"
+              style="font:700 16px Arial;fill:#d1d5db;">
+              {user["following"]["totalCount"]}
+            </text>
+
+            <!-- Streak Section -->
+            <line
+              x1="25"
+              y1="370"
+              x2="1075"
+              y2="370"
+              stroke="#cbd5e1"
+            />
+
+            <text
+              x="30"
+              y="405"
+              class="section">
+              🔥 Streak Stats
+            </text>
+
+            <rect
+              x="60"
+              y="430"
+              width="980"
+              height="110"
+              rx="5"
+              fill="#1f2230"
+            />
+
+            <text
+              x="150"
+              y="475"
+              class="stat-label">
+              Current Streak
+            </text>
+
+            <text
+              x="170"
+              y="515"
+              class="stat-value"
+              fill="#58a6ff">
+              0
+            </text>
+
+            <text
+              x="210"
+              y="515"
+              class="stat-label">
+              days
+            </text>
+
+            <text
+              x="420"
+              y="475"
+              class="stat-label">
+              Longest Streak
+            </text>
+
+            <text
+              x="440"
+              y="515"
+              class="stat-value"
+              fill="#a371f7">
+              0
+            </text>
+
+            <text
+              x="480"
+              y="515"
+              class="stat-label">
+              days
+            </text>
+
+            <text
+              x="700"
+              y="475"
+              class="stat-label">
+              Total Contributions
+            </text>
+
+            <text
+              x="770"
+              y="515"
+              class="stat-value"
+              fill="#f2cc60">
+              {user["currentYear"]["contributionCalendar"]["totalContributions"]}
+            </text>
+
+            <text
+              x="30"
+              y="590"
+              class="footer">
+              Note: Stats are updated daily via GitHub Actions 🚀
             </text>
 
           </svg>'''
 
-          os.makedirs("assets", exist_ok=True)
+          os.makedirs(
+              "assets",
+              exist_ok=True
+          )
 
           with open(
               "assets/github-stats.svg",
@@ -508,6 +799,9 @@ jobs:
               encoding="utf-8"
           ) as file:
               file.write(svg)
+
+          print("GitHub stats SVG generated successfully.")
+
           PY
 
       - name: Commit updated stats
